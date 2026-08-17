@@ -1,0 +1,5 @@
+/.build/
+/Net-Async-Forgejo-*/
+*.tar.gz
+/.git/
+/cover_db/
