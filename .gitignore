@@ -3,3 +3,7 @@
 *.tar.gz
 /.git/
 /cover_db/
+
+# karr materialized task view -- never commit
+tasks/
+config.yml

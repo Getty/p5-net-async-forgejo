@@ -1,0 +1,9 @@
+claude: true
+prompt: |
+  Drain the Net-Async-Forgejo karr board. This is the async IO::Async Forgejo
+  client — a thin transport layer that delegates all Forgejo semantics to the
+  sibling WWW::Forgejo (../p5-www-forgejo). Delegate behavior-relevant code to
+  the net-async-forgejo-worker agent and release audits to
+  net-async-forgejo-release-checker; follow .claude/rules/net-async-forgejo-rules.md.
+  Never release. Cross-repo work is a ticket on the other repo's board, never a
+  direct edit.
