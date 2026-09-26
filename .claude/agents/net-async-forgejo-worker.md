@@ -2,7 +2,6 @@
 name: net-async-forgejo-worker
 description: "Default Net::Async::Forgejo worker — implement, refactor, debug, and test code in this distribution (the async IO::Async Forgejo client). Pre-loaded with the delegation architecture, async/Future conventions, and release setup. Use for any behavior-relevant change to lib/ or t/. Leaves a commit-ready tree; never commits — commits belong to net-async-forgejo-release-manager."
 model: inherit
-allowed-tools: Read, Edit, Write, Bash, Glob, Grep
 briefing:
   skills:
     - net-async-forgejo-core
