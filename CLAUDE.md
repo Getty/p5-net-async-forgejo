@@ -22,7 +22,7 @@ principle and lane are in `.claude/rules/net-async-forgejo-rules.md`.
 | Task | Agent |
 |---|---|
 | Implement / refactor / debug behavior-relevant code | `net-async-forgejo-worker` (default) |
-| Pre-release audit | `net-async-forgejo-release-checker` |
+| Commits, `Changes`, card → done, pre-release audit | `net-async-forgejo-release-manager` |
 
 The agents carry their skills via `briefing.skills` (see `.claude/agents/`); the main
 agent delegates rather than loading them. Skill sources live under `.claude/skills/`
