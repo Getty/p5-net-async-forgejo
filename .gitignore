@@ -7,3 +7,7 @@
 # karr materialized task view -- never commit
 tasks/
 config.yml
+
+# skilletor: committe Config + Ignore-Block
+!.claude/skilletor.json
+!.claude/.gitignore
