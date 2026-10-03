@@ -16,11 +16,11 @@ __END__
 =head1 SYNOPSIS
 
     use IO::Async::Loop;
-    use Net::Async::Forgejo;
+    use Net::Async::Forgejo::API;
 
     my $loop = IO::Async::Loop->new;
 
-    my $forgejo = Net::Async::Forgejo->new(
+    my $forgejo = Net::Async::Forgejo::API->new(
         url   => 'https://src.ci',
         token => $ENV{FORGEJO_TOKEN},
     );
@@ -29,8 +29,8 @@ __END__
     # Future-based API - all methods return Futures
     my $user = $forgejo->get('/user')->get;
 
-    # List repositories
-    my $repos = $forgejo->get('/repos')->get;
+    # List your repositories (all pages, see Net::Async::Forgejo::API)
+    my $repos = $forgejo->get('/user/repos')->get;
 
     # Create an issue (non-blocking)
     $forgejo->post('/repos/myorg/myrepo/issues', {
@@ -44,9 +44,11 @@ __END__
 
 =head1 DESCRIPTION
 
-C<Net::Async::Forgejo> provides an async client for the Forgejo API built on
-L<IO::Async>. All HTTP methods return L<Future> objects for non-blocking
-operation.
+C<Net::Async::Forgejo> is the distribution's name; the client itself is
+L<Net::Async::Forgejo::API>, an async client for the Forgejo API built on
+L<IO::Async>. This package carries no code of its own - construct
+L<Net::Async::Forgejo::API> as shown above. All its HTTP methods return
+L<Future> objects for non-blocking operation; API errors fail the Future.
 
 Request building, authentication, and response parsing are delegated to
 L<WWW::Forgejo>, so the same JSON handling, error messages, and logging

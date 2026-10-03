@@ -2,26 +2,16 @@ use strict;
 use warnings;
 use Test::More;
 use lib 'lib';
-# Sibling checkout. Defaults to the standard main sibling like the other tests;
-# FORGEJO_SIBLING_LIB lets the paired phase2 checkout be loaded for verification
-# without editing this file (an in-script `use lib` cannot be overridden by
-# PERL5LIB, so the override has to live here).
-use lib ($ENV{FORGEJO_SIBLING_LIB} // '../p5-www-forgejo/lib');
+use lib '../p5-www-forgejo/lib';
 
 use Future;
 use HTTP::Response;
 use WWW::Forgejo::HTTPResponse;
 use Net::Async::Forgejo::API;
 
-# This proves the paired feature of WWW::Forgejo karr #1 (HTTPResponse->headers,
-# commit 1083fa8) surfaces through the async transport. That attribute lives on
-# the unreleased phase2-forgejo branch; the main sibling has no headers accessor,
-# so skip loudly there until the coordinated phase2 -> main landing (karr #2).
-plan skip_all =>
-      "paired WWW::Forgejo feature absent: WWW::Forgejo::HTTPResponse has no "
-    . "headers attribute (sibling on main). Coordinated phase2 -> main landing "
-    . "pending (karr #2). Set FORGEJO_SIBLING_LIB to the phase2 lib to run."
-    unless WWW::Forgejo::HTTPResponse->can('headers');
+# Proves that WWW::Forgejo::HTTPResponse->headers (WWW::Forgejo karr #1) is
+# filled by the async transport, so header-driven logic such as X-Total-Count
+# pagination works through the async path too.
 
 # Fake Net::Async::HTTP: returns a canned HTTP::Response through the same
 # ->do_request(request => ...) -> Future interface the real transport uses.

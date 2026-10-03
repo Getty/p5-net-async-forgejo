@@ -2,8 +2,7 @@ use strict;
 use warnings;
 use Test::More;
 use lib 'lib';
-# See t/04-headers-bridge.t for why the sibling lib is env-overridable.
-use lib ($ENV{FORGEJO_SIBLING_LIB} // '../p5-www-forgejo/lib');
+use lib '../p5-www-forgejo/lib';
 
 use Future;
 use HTTP::Response;
@@ -13,15 +12,9 @@ use IO::Async::Loop;
 use WWW::Forgejo::HTTPResponse;
 use Net::Async::Forgejo::API;
 
-# Async pagination (this repo's karr #3) mirrors WWW::Forgejo karr #5 (auto-
-# pagination via X-Total-Count, commit 48c14fa) which reads HTTPResponse->headers.
-# Both live only on the unreleased phase2-forgejo branch; skip on the main sibling
-# until the coordinated phase2 -> main landing (karr #3).
-plan skip_all =>
-      "paired WWW::Forgejo feature absent: WWW::Forgejo::HTTPResponse has no "
-    . "headers attribute (sibling on main). Coordinated phase2 -> main landing "
-    . "pending (karr #3). Set FORGEJO_SIBLING_LIB to the phase2 lib to run."
-    unless WWW::Forgejo::HTTPResponse->can('headers');
+# Async pagination mirrors WWW::Forgejo::Role::HTTP get (WWW::Forgejo karr #5):
+# auto-pagination via X-Total-Count from HTTPResponse->headers, over a bare
+# array or the data arrayref of a search envelope.
 
 # Offline fake transport. The responder is handed the outgoing HTTP::Request so a
 # test can serve different pages by ?page= / ?limit= and record the offsets asked.
@@ -179,6 +172,66 @@ subtest 'total not greater than first page: no extra requests' => sub {
     my $result = $api->get('/repos/o/r/issues')->get;
     is(scalar @$result, 2, 'complete first page returned');
     is(scalar @reqs, 1, 'nothing more fetched when total == items already held');
+};
+
+subtest 'search envelope: data pages merged, envelope shape kept' => sub {
+    my @reqs;
+    my %pages = (
+        1 => [ { id => 1 }, { id => 2 } ],
+        2 => [ { id => 3 }, { id => 4 } ],
+        3 => [ { id => 5 } ],
+    );
+    my $api = new_api();
+    $api->{_http} = FakeHTTP->new(responder => sub {
+        my $q = query_of($_[0]);
+        push @reqs, $q;
+        my $page = $q->{page} // 1;
+        return Future->done(page_response({ ok => JSON::MaybeXS::true(),
+            data => $pages{$page} // [] }, 5));
+    });
+
+    my $result = $api->get('/repos/search', params => { q => 'x' })->get;
+
+    is(ref $result, 'HASH', 'still the envelope object');
+    ok($result->{ok}, 'other envelope keys kept');
+    is_deeply([ map { $_->{id} } @{ $result->{data} } ], [ 1, 2, 3, 4, 5 ],
+        'data holds every page, in order');
+    is(scalar @reqs, 3, 'three page requests');
+    is($reqs[1]{page}, 2, 'second request is page 2');
+    is($reqs[1]{limit}, 2, 'limit == first-page size');
+    is($reqs[2]{q}, 'x', 'caller params kept on follow-up pages');
+};
+
+subtest 'envelope without X-Total-Count is returned unchanged' => sub {
+    my @reqs;
+    my $api = new_api();
+    $api->{_http} = FakeHTTP->new(responder => sub {
+        push @reqs, query_of($_[0]);
+        return Future->done(page_response({ ok => 1, data => [ { id => 1 } ] },
+            undef, no_total => 1));
+    });
+
+    my $result = $api->get('/repos/search')->get;
+    is_deeply($result, { ok => 1, data => [ { id => 1 } ] }, 'as it came');
+    is(scalar @reqs, 1, 'no extra requests');
+};
+
+subtest 'an error on a follow-up page fails the Future' => sub {
+    my $api = new_api();
+    $api->{_http} = FakeHTTP->new(responder => sub {
+        my $page = query_of($_[0])->{page} // 1;
+        return Future->done($page == 1
+            ? page_response([ { id => 1 }, { id => 2 } ], 5)
+            : HTTP::Response->new(500, 'Internal Server Error',
+                [ 'Content-Type' => 'application/json' ],
+                '{"message":"database is locked"}'));
+    });
+
+    my $f = $api->get('/repos/o/r/issues');
+    $f->await;
+    ok($f->is_failed, 'the whole get fails');
+    like(scalar $f->failure, qr/\AForgejo API error: database is locked/,
+        'with the API error of the failing page');
 };
 
 subtest 'non-blocking: chain resolves across real loop turns' => sub {
