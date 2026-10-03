@@ -1,0 +1,32 @@
+---
+claimed_at: 2026-10-03T00:45:39Z
+claimed_by: net-async-forgejo-worker
+class: standard
+completed: 2026-10-03T00:45:39Z
+created: 2026-09-09T09:51:23Z
+id: 2
+priority: medium
+started: 2026-09-10T03:55:39Z
+status: done
+tags:
+- bridge
+- transport
+- coordination
+title: 'Bridge: pass HTTP response headers through HTTPResponse (paired with WWW::Forgejo
+  #1)'
+updated: 2026-10-03T00:45:39Z
+---
+
+WWW::Forgejo::HTTPResponse now carries a headers attribute with lower-cased keys (WWW::Forgejo karr #1, commit 1083fa8 on branch phase2-forgejo, not yet released). The async IO::Async transport in this sibling should populate that headers hashref when it builds the HTTPResponse it hands back across the Role::IO seam, so shared code (e.g. WWW::Forgejo pagination reading headers x-total-count, WWW::Forgejo #5) works identically through the async path. Matching paired change to the just-added headers attribute. Filed by the Phase 2 batch working WWW::Forgejo; no code changed in this repo.
+
+2026-09-09 11:19 Assessment (phase2 batch): left open. Paired with WWW::Forgejo #1 (headers attribute, commit 1083fa8) which lives on the UNMERGED, unreleased branch phase2-forgejo, not on WWW::Forgejo main and not in the installed sibling - WWW::Forgejo::HTTPResponse from the installed main has no headers accessor (verified: can headers = NO). This async repo HEAD is itself a WIP commit and its baseline dzil test is already RED (t/03-integration.t expects phase2-forgejo URL-encoding that is absent from installed main). Implementing and verifying the async headers bridge needs the coordinated phase2-forgejo sibling landing under the lockstep-release coupling - a maintainer decision. Not done autonomously; no code changed here.
+
+Code implementiert + offline verifiziert (t/04-headers-bridge.t, Mock-Transport). _do_request in API.pm (Z.111-118) durchreicht Response-Header lowercase in WWW::Forgejo::HTTPResponse->headers; Test beweist x-total-count-Durchreichung ueber async-Pfad. Commit 727953f. Gruen gegen phase2-forgejo-Sibling; skippt sauber gegen main (kein headers-Attribut). Wartet auf koordiniertes phase2->main-Landing (Maintainer-Entscheidung), bevor Baseline gegen installierte/main-Schwester gruen ist.
+
+Re-check gegen WWW::Forgejo main c2831cc (phase2 gelandet), fertigstellen
+
+2026-10-03 00:40 Re-check gegen WWW::Forgejo main c2831cc: headers-Attribut vorhanden, Skip-Guard + FORGEJO_SIBLING_LIB-Override in t/04 entfernt (obsolet). _do_request jetzt wie LWPIO: Body via decoded_content(charset => 'none') (gzip entpackt, Charset nicht dekodiert), Mehrfach-Header mit ', ' gejoint. Neuer Test t/06-transport-body.t (vorher rot: Bytes ohne charset wurden zu Zeichen, Mehrfach-Header verloren).
+
+2026-10-03 00:42 Done gegen WWW::Forgejo main c2831cc: _do_request liefert Body als Bytes (decoded_content(charset => 'none'), gzip entpackt, kein Charset-Decode - wie LWPIO), Mehrfach-Header mit ', ' gejoint, Keys lowercase. t/04: Skip-Guard und FORGEJO_SIBLING_LIB-Override entfernt (obsolet). Neu t/06-transport-body.t (UTF-8-JSON, gzip, text/plain+charset -> Zeichen, ohne charset -> Bytes, Mehrfach-Header); war gegen alten Code rot (3 Subtests). Auch: Verben an Role::HTTP angeglichen (params/upload/raw, delete mit Body, check), t/07-verbs.t. Suite: Files=8, Tests=52, PASS, keine Skips. Also found: _http nutzt require Net::Async::HTTP (lazy, House-Rule) und IO::Async::SSL fehlt in cpanfile (NaHTTP-0.50-Slot-Leak/Hang bei https, s. perl-io-async-future); cpanfile on test deklariert HTTP::Response/JSON::MaybeXS/IO::Async::Loop nicht (vorbestehend). Nicht geaendert.
+
+2026-10-03 00:45 Erledigt in 2fd1bbf
