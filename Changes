@@ -1,3 +1,13 @@
 {{$NEXT}}
 
-- Initial release
+  - Async Forgejo client on IO::Async and Net::Async::HTTP, a thin transport
+    layer over WWW::Forgejo (request building, auth, JSON and errors);
+    released in lockstep with WWW::Forgejo 0.001
+  - Future-based verbs get/post/put/patch/delete/check taking the WWW::Forgejo
+    options params, upload (multipart) and raw; delete accepts a body
+  - Non-blocking auto-pagination via X-Total-Count (page_size, max_pages),
+    including the search envelope, returning the same shape as WWW::Forgejo
+  - Response headers pass through to WWW::Forgejo::HTTPResponse; body bytes
+    and charset are handled like WWW::Forgejo::LWPIO
+  - API errors arrive as failed Futures ("Forgejo API error: ..."), on
+    follow-up pages too
