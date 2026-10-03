@@ -1,0 +1,20 @@
+---
+class: standard
+completed: 2026-10-03T00:45:12Z
+created: 2026-08-31T04:02:00Z
+id: 1
+priority: high
+started: 2026-10-03T00:45:12Z
+status: done
+tags:
+- coordination
+- release
+title: www-forgejo braucht eigenes House-Setup (gemeinsamer Release)
+updated: 2026-10-03T00:45:12Z
+---
+
+Das Schwester-Repo p5-www-forgejo (WWW::Forgejo) steht ohne getty-agent-team-Setup da: keine Agenten, keine Skills, kein karr-Board. Net-Async-Forgejo delegiert alles Fachliche dorthin (Request-Bau/Auth/JSON/HTTPResponse) und wird GEMEINSAM mit WWW::Forgejo released. Aufgabe gehoert in JENES Repo (nicht von hier aus anfassen). Kopplung hier festgehalten in .claude/rules/net-async-forgejo-rules.md. Ticket dient als Erinnerung an die Release-Kopplung; das eigentliche Setup ist im eigenen Board von p5-www-forgejo anzulegen.
+
+2026-09-09 11:19 Assessment (phase2 batch): confirmed the release coupling is documented in .claude/rules/net-async-forgejo-rules.md (released in lockstep with WWW::Forgejo). The actual www-forgejo house-setup work is explicitly out of scope for this repo per the ticket body (do not touch from here; belongs on p5-www-forgejo own board). Left open as a cross-repo/release coordination reminder for the maintainer.
+
+2026-10-03 00:45 p5-www-forgejo hat eigenes House-Setup (.claude/agents/www-forgejo-worker.md + www-forgejo-release-manager.md, eigenes karr-Board, Karten 10-28); Lockstep-Kopplung in .claude/rules dokumentiert
