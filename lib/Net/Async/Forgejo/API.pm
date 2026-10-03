@@ -339,9 +339,12 @@ the same data.
 A response status outside the 2xx range fails the returned L<Future> with the
 message L<WWW::Forgejo::Role::HTTP> would croak with, C<Forgejo API error: ...>
 - including an error on a later page of an auto-paginated C<get>. A transport
-error from L<Net::Async::HTTP> fails it as well. Invalid arguments (an
-C<upload> without a file or content) and a missing L</url> or L</token> croak
-right away, before a Future is returned.
+error from L<Net::Async::HTTP> fails it as well.
+
+Only API and transport errors arrive as a failed Future. Configuration and
+calling errors are programming errors and croak right away, before a Future is
+returned: a missing L</url> or L</token>, or an C<upload> without a file or
+content.
 
 The response body is handed to L<WWW::Forgejo> as bytes, with a
 C<Content-Encoding> such as gzip undone but no charset decoding, exactly like
