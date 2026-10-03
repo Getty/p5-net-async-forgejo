@@ -1,0 +1,30 @@
+---
+claimed_at: 2026-10-03T00:45:46Z
+claimed_by: net-async-forgejo-worker
+class: standard
+completed: 2026-10-03T00:45:46Z
+created: 2026-09-09T10:28:40Z
+id: 3
+priority: medium
+started: 2026-09-10T03:56:05Z
+status: done
+tags:
+- bridge
+- pagination
+- coordination
+title: 'Bridge: async pagination matching WWW::Forgejo get X-Total-Count paging (paired
+  with WWW::Forgejo #5)'
+updated: 2026-10-03T00:45:46Z
+---
+
+WWW::Forgejo get now auto paginates bare array list responses by looping subsequent pages using X Total Count with a consistent per page limit so offsets stay aligned (WWW::Forgejo karr #5, commit 48c14fa on branch phase2-forgejo, unreleased). That loop is synchronous transport specific. The async IO::Async sibling needs an equivalent non blocking pagination path so list results come back fully paged through the async client too, using the shared X Total Count semantics and the HTTPResponse headers. Paired change. Filed by the Phase 2 batch; no code changed here.
+
+2026-09-09 11:19 Assessment (phase2 batch): left open. Paired with WWW::Forgejo #5 (auto-pagination via X-Total-Count, commit 48c14fa) on the same UNMERGED phase2-forgejo branch. Depends on the headers bridge (ticket 2) and on the coordinated sibling landing; it is a substantial non-blocking async pagination feature. Same blocker as ticket 2: installed main sibling lacks the paired features, async HEAD is WIP, baseline red, lockstep-release coordination is a maintainer decision. Not done autonomously; no code changed here.
+
+Code implementiert + offline verifiziert (t/05-async-pagination.t, 8 Subtests, Mock-Transport). API.pm get() paginiert bare-array List-GETs nicht-blockierend via X-Total-Count: rekursiver _paginate-Helfer verkettet Folgeseiten ueber die zurueckgegebene Future (KEIN blockierendes ->get), konsistentes per-page-limit haelt (page-1)*limit-Offsets aligned; page_size erzwingt limit auf jeder Seite, max_pages (Default 100) kappt. Spiegelt phase2 WWW::Forgejo::Role::HTTP get() (48c14fa). Edge-Cases getestet: pinned page, single object, kein X-Total-Count, total<=erste Seite, max_pages-Cap, echter Loop-Turn (delay_future) fuer Nicht-Blockieren. Commit 727953f. Gruen gegen phase2-forgejo-Sibling; skippt sauber gegen main. Wartet auf koordiniertes phase2->main-Landing (Maintainer-Entscheidung), bevor Baseline gegen installierte/main-Schwester gruen ist.
+
+Re-check gegen WWW::Forgejo main c2831cc inkl. Search-Envelope, fertigstellen
+
+2026-10-03 00:42 Done gegen WWW::Forgejo main c2831cc: async get ermittelt die Collection ueber $forgejo->_collection_ref (bare Array oder Search-Envelope {ok, data}), paginiert nicht-blockierend via X-Total-Count und gibt die gleiche Form zurueck (Envelope mit gemergtem data bzw. Array). raw => 1 wird an _parse_response durchgereicht (keine Pagination). Fehler auf Folgeseite failt die Future mit 'Forgejo API error: ...'. total_count aus Body bewusst NICHT (WWW-Forgejo-Karte 22). t/05: Skip-Guard + Override entfernt, neue Subtests Envelope-Merge (gegen alten Code rot), Envelope ohne X-Total-Count, Fehler auf Folgeseite. Suite: Files=8, Tests=52, PASS, keine Skips.
+
+2026-10-03 00:45 Erledigt in 2fd1bbf (inkl. Search-Envelope)
