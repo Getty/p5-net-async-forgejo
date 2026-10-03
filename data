@@ -1,0 +1,27 @@
+---
+claimed_at: 2026-10-03T00:45:32Z
+claimed_by: net-async-forgejo-worker
+class: standard
+completed: 2026-10-03T00:45:32Z
+created: 2026-09-18T02:51:48Z
+id: 4
+priority: medium
+started: 2026-10-03T00:35:36Z
+status: done
+tags:
+- encoding
+- test
+- bridge
+- escalated-from:WWW-Forgejo#10
+title: t/03-integration double-encoding assertion contradicts WWW::Forgejo encoding
+  contract
+updated: 2026-10-03T00:45:32Z
+---
+
+t/03-integration.t line 38 asserts _build_request('GET','/repos/my%20org/my%20repo') double-encodes to /repos/my%2520org/my%2520repo. But WWW::Forgejo OWNS the path-encoding semantics, and its t/05-urlencode.t codifies the opposite contract: controllers uri_escape their variable segments and _build_request passes the assembled path through VERBATIM (only query params are encoded). The sibling's line-35 assertion (/repos/owner/my-repo unchanged) already matches that contract; line 38 does not. Making _build_request escape % in the path to satisfy line 38 would break WWW::Forgejo t/05 (a controller-encoded %20 becomes %2520 and its qr/%20/ assertion fails), so the shared seam must NOT change -- the fix belongs in THIS test. Update the line-38 assertion to expect the path passed through verbatim (/repos/my%20org/my%20repo) and drop the 'double-encoded' wording. Verified 2026-09-18: with WWW::Forgejo phase2 landed on main, the full sibling offline suite is green EXCEPT this single assertion. Baseline blocker 2 of WWW-Forgejo#10; blockers 1 (url accessor) and 3 (/api/v1) are resolved on the WWW::Forgejo side.
+
+2026-10-03 00:38 t/03-integration.t: Assertion auf unveraendertes Durchreichen (/repos/my%20org/my%20repo) umgestellt, Kommentar verweist auf Einfach-Kodierungs-Vertrag aus WWW::Forgejo t/05-urlencode.t. t/03 gruen (7/7).
+
+2026-10-03 00:42 Done: t/03-integration.t erwartet jetzt unveraendertes Durchreichen (/repos/my%20org/my%20repo), Kommentar begruendet mit dem Einfach-Kodierungs-Vertrag (WWW::Forgejo t/05-urlencode.t). Verifiziert: prove -l -I /home/getty/dev/p5-www-forgejo/lib t/ -> Files=8, Tests=52, PASS, keine Skips. Nicht committet (Worktree lockstep-release).
+
+2026-10-03 00:45 Erledigt in 966568e
