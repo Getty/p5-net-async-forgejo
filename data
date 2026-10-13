@@ -1,0 +1,21 @@
+---
+class: standard
+completed: 2026-10-13T20:31:17Z
+created: 2026-10-03T00:48:03Z
+id: 5
+priority: low
+started: 2026-10-13T20:29:48Z
+status: done
+tags:
+- bridge
+- pagination
+- coordination
+- needs:WWW-Forgejo#22
+title: 'Follow WWW::Forgejo #22: paginate the Actions runs envelope (total_count in
+  body)'
+updated: 2026-10-13T20:31:17Z
+---
+
+Once WWW::Forgejo #22 lands (Role::HTTP get recognising the /actions/runs envelope { workflow_runs => [...], total_count => N } - Forgejo 15 sends no X-Total-Count there), mirror it in Net::Async::Forgejo::API get/_paginate: take the collection and total the way WWW::Forgejo does (ideally via its helper, as _collection_ref today), keep the returned shape, test offline against ../p5-www-forgejo/lib. Do not implement before #22 is on WWW::Forgejo main.
+
+2026-10-13 20:30 Done (Branch k5-runs-envelope, Worktree .claude/worktrees/k5-runs-envelope, Basis main 9f39d26): API::get delegiert Total an WWW::Forgejo _collection_total($data,$headers) und Re-Wrapping an _collection_key (keine eigene Regex/Spiegelung mehr); _paginate-Kommentar angepasst; Changes ergänzt. Gemessen: 3 neue Subtests in t/05-async-pagination.t (body total_count, pinned/complete ohne Extra-Request, Header gewinnt), rot gegen altes lib (Tests 12 und 14 fehlgeschlagen), danach prove -l -I../p5-www-forgejo/lib t grün: 9 Dateien, 61 Tests. cpanfile unverändert: requires WWW::Forgejo 0.001 entspricht bereits $VERSION 0.001 in p5-www-forgejo (b757a83 auf dessen main). Hinweis: die Tests laden per use lib '../p5-www-forgejo/lib', das aus dem Worktree nicht existiert; Lauf deshalb mit -I auf den Schwester-Checkout. Offen: net-async-forgejo-worker/-release-manager waren in dieser Session nicht spawnbar, Änderung und Commit hat der Dispatcher direkt gemacht.
