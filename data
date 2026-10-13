@@ -1,0 +1,31 @@
+---
+class: standard
+completed: 2026-10-13T19:50:24Z
+created: 2026-10-06T19:44:16Z
+id: 7
+priority: medium
+started: 2026-10-13T19:50:24Z
+status: done
+tags:
+- bug
+- async
+- review-2026-10-06
+title: configure(token/url) after the first request keeps using the old credentials
+updated: 2026-10-13T19:50:24Z
+---
+
+`_forgejo` (`lib/Net/Async/Forgejo/API.pm:68-74`) caches the internal `WWW::Forgejo` in `$self->{_forgejo}`; `configure` (`API.pm:21-28`) stores a new `url`/`token` but never drops that cache. After the first request (or any call that touched `_forgejo`) a reconfiguration changes what the accessors report, not what is sent:
+
+    my $f = Net::Async::Forgejo::API->new(url => 'https://src.ci', token => 'old');
+    $f->_forgejo;                                   # any request does this
+    $f->configure(token => 'new', url => 'https://other.example');
+    print $f->token;                 # new
+    print $f->_forgejo->token;       # old   <- goes into the Authorization header
+    print $f->_forgejo->base_url;    # https://src.ci/api/v1
+
+`configure` is IO::Async::Notifier's public reconfiguration API, so token rotation on a long-lived notifier silently keeps the revoked token.
+
+Done when: `configure` deletes `$self->{_forgejo}` whenever `url` or `token` is passed (requests in flight keep their old client), with a regression test.
+
+---
+Fleet review 2026-10-06 · kind: bug · confidence: verified
