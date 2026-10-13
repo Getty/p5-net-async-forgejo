@@ -1,0 +1,28 @@
+---
+class: standard
+completed: 2026-10-13T19:50:24Z
+created: 2026-10-06T19:44:20Z
+id: 8
+priority: low
+started: 2026-10-13T19:50:24Z
+status: done
+tags:
+- bug
+- drift
+- review-2026-10-06
+title: base_url accessor disagrees with the URL requests are built against
+updated: 2026-10-13T19:50:24Z
+---
+
+`base_url` (`lib/Net/Async/Forgejo/API.pm:62-65`) is `$self->url . '/api/v1'`. `WWW::Forgejo` strips trailing slashes and appends `/api/v1` only when it is not there yet (`WWW/Forgejo.pm`, `BUILDARGS`), and that is the base the async requests really use via `_forgejo`.
+
+    my $f = Net::Async::Forgejo::API->new(url => 'https://src.ci/api/v1/', token => 't');
+    $f->base_url;             # https://src.ci/api/v1//api/v1
+    $f->_forgejo->base_url;   # https://src.ci/api/v1
+
+`url` likewise returns the raw value where the sync client returns it without the trailing slash.
+
+Done when: `url` and `base_url` delegate to the internal `WWW::Forgejo` (single source of truth), with a test for a trailing slash and an already suffixed URL.
+
+---
+Fleet review 2026-10-06 · kind: bug · confidence: verified
