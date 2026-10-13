@@ -1,0 +1,31 @@
+---
+class: standard
+completed: 2026-10-13T19:50:24Z
+created: 2026-10-06T19:44:11Z
+id: 6
+priority: medium
+started: 2026-10-13T19:50:24Z
+status: done
+tags:
+- bug
+- async
+- drift
+- review-2026-10-06
+title: No request timeout and no way to set one - a stalled server never resolves
+  the Future
+updated: 2026-10-13T19:50:24Z
+---
+
+`_http` (`lib/Net/Async/Forgejo/API.pm:77-86`) builds `Net::Async::HTTP` with only `user_agent` and `max_connections_per_host`. Net::Async::HTTP applies no timeout unless one is given, so a request to an instance that accepts the connection and then stalls stays pending forever. The sync sibling has `WWW::Forgejo::LWPIO->timeout` (default 30 s).
+
+There is also no way to pass one in: `configure` (`API.pm:21-28`) knows only `url` and `token`.
+
+    Net::Async::Forgejo::API->new(url => 'http://x', token => 't', timeout => 5)
+    # Unrecognised configuration keys for Net::Async::Forgejo::API - timeout
+
+The same goes for the transport itself: no `http` attribute to inject a preconfigured or mock Net::Async::HTTP (the tests reach into `$self->{_http}`), unlike `Net::Async::MikroTik`, which has `timeout`, `verify_ssl` and `http`.
+
+Done when: `timeout` is a configure key with the sync default (30) applied to the default transport, an `http` key accepts any object with `do_request`, both are documented, and a test proves a timeout fails the Future.
+
+---
+Fleet review 2026-10-06 · kind: bug · confidence: verified
