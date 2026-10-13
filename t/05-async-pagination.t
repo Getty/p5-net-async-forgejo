@@ -258,4 +258,76 @@ subtest 'non-blocking: chain resolves across real loop turns' => sub {
         'pages merged across deferred loop turns');
 };
 
+# Actions runs envelope (WWW::Forgejo karr #22): the runs sit under
+# workflow_runs and Forgejo 15 sends the total only as total_count in the body.
+sub runs_response {
+    my ($runs, $total, %headers) = @_;
+    return HTTP::Response->new(200, 'OK',
+        [ 'Content-Type' => 'application/json', %headers ],
+        encode_json({ total_count => $total, workflow_runs => $runs }));
+}
+
+subtest 'runs envelope: pages merged by body total_count, shape kept' => sub {
+    my @reqs;
+    my %pages = (
+        1 => [ { id => 1 }, { id => 2 } ],
+        2 => [ { id => 3 } ],
+    );
+    my $api = new_api();
+    $api->{_http} = FakeHTTP->new(responder => sub {
+        my $q = query_of($_[0]);
+        push @reqs, $q;
+        return Future->done(runs_response($pages{ $q->{page} // 1 } // [], 3));
+    });
+
+    my $result = $api->get('/repos/o/r/actions/runs')->get;
+
+    is(ref $result, 'HASH', 'envelope shape kept');
+    is($result->{total_count}, 3, 'other envelope keys kept');
+    is_deeply([ map { $_->{id} } @{ $result->{workflow_runs} } ], [ 1, 2, 3 ],
+        'workflow_runs replaced by the merged collection');
+    is(scalar @reqs, 2, 'two page requests');
+    is($reqs[1]{page}, 2, 'second request is page 2');
+    is($reqs[1]{limit}, 2, 'limit == first-page size (offset aligned)');
+};
+
+subtest 'runs envelope: pinned page and complete total issue no extra requests' => sub {
+    my @reqs;
+    my $api = new_api();
+    $api->{_http} = FakeHTTP->new(responder => sub {
+        push @reqs, query_of($_[0]);
+        return Future->done(runs_response([ { id => 1 }, { id => 2 } ], 100));
+    });
+
+    my $pinned = $api->get('/repos/o/r/actions/runs', params => { page => 2 })->get;
+    is(scalar @reqs, 1, 'pinned page: one request');
+    is(scalar @{ $pinned->{workflow_runs} }, 2, 'pinned page returned as is');
+
+    @reqs = ();
+    $api->{_http} = FakeHTTP->new(responder => sub {
+        push @reqs, query_of($_[0]);
+        return Future->done(runs_response([ { id => 1 }, { id => 2 } ], 2));
+    });
+    my $all = $api->get('/repos/o/r/actions/runs')->get;
+    is(scalar @reqs, 1, 'total_count == items: one request');
+    is(scalar @{ $all->{workflow_runs} }, 2, 'returned unchanged');
+};
+
+subtest 'runs envelope: X-Total-Count header wins over body total_count' => sub {
+    my @reqs;
+    my $api = new_api();
+    $api->{_http} = FakeHTTP->new(responder => sub {
+        my $q = query_of($_[0]);
+        push @reqs, $q;
+        return Future->done($q->{page}
+            ? runs_response([ { id => 3 } ], 2, 'X-Total-Count' => 3)
+            : runs_response([ { id => 1 }, { id => 2 } ], 2, 'X-Total-Count' => 3));
+    });
+
+    my $result = $api->get('/repos/o/r/actions/runs')->get;
+
+    is(scalar @reqs, 2, 'header total (3) drove a second request despite body total_count 2');
+    is(scalar @{ $result->{workflow_runs} }, 3, 'all runs collected');
+};
+
 done_testing;

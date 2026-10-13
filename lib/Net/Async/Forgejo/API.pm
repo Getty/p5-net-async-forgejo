@@ -198,7 +198,7 @@ sub _request {
 
 # Internal: non-blocking pagination loop. Fetches the next page and recurses
 # through the Future chain (never a blocking ->get) until the accumulated items
-# reach X-Total-Count or the max_pages safety cap. Mirrors the sync
+# reach the reported total or the max_pages safety cap. Mirrors the sync
 # WWW::Forgejo::Role::HTTP get() paging: a consistent per-page limit keeps
 # Forgejo's (page - 1) * limit offsets contiguous.
 sub _paginate {
@@ -240,18 +240,19 @@ sub get {
     return $self->_request_with_response('GET', $path, %opts)->then(sub {
         my ($data, $response) = @_;
 
-        # Locate the collection this response paginates over - a bare array or
-        # the data arrayref of a search envelope; WWW::Forgejo decides - and
-        # auto-paginate it only when the server reports it as truncated and the
-        # caller has not pinned a specific page. Anything else (a plain object,
-        # a raw body, no X-Total-Count, a pinned page) resolves unchanged with
-        # no extra HTTP calls.
+        # Locate the collection this response paginates over - a bare array, the
+        # data arrayref of a search envelope or the workflow_runs arrayref of an
+        # Actions runs envelope; WWW::Forgejo decides - and auto-paginate it
+        # only when the server reports it as truncated (X-Total-Count, else the
+        # body's total_count) and the caller has not pinned a specific page.
+        # Anything else (a plain object, a raw body, no total, a pinned page)
+        # resolves unchanged with no extra HTTP calls.
         my $items = $self->_forgejo->_collection_ref($data);
         return Future->done($data) unless $items;
         return Future->done($data) if $pinned;
 
-        my $total = $response->headers->{'x-total-count'};
-        return Future->done($data) unless defined $total && $total =~ /^[0-9]+$/;
+        my $total = $self->_forgejo->_collection_total($data, $response->headers);
+        return Future->done($data) unless defined $total;
         return Future->done($data) unless $total > scalar @$items;
 
         # With no explicit page_size the server's page size is exactly the item
@@ -268,10 +269,12 @@ sub get {
             page      => 1,
         })->then(sub {
             my ($collected) = @_;
-            # Same shape as received: a search envelope keeps its other keys,
-            # with data replaced by the merged collection.
-            return Future->done(ref $data eq 'HASH'
-                ? { %$data, data => $collected }
+            # Same shape as received: an envelope keeps its other keys, with
+            # only its collection key (data / workflow_runs) replaced by the
+            # merged collection.
+            my $key = $self->_forgejo->_collection_key($data);
+            return Future->done(defined $key
+                ? { %$data, $key => $collected }
                 : $collected);
         });
     });
