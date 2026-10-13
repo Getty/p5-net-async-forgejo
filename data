@@ -1,0 +1,23 @@
+---
+class: standard
+completed: 2026-10-13T19:50:24Z
+created: 2026-10-06T19:44:27Z
+id: 9
+priority: low
+started: 2026-10-13T19:50:24Z
+status: done
+tags:
+- async
+- tls
+- drift
+- review-2026-10-06
+title: 'https without IO::Async::SSL: no up-front check, later requests can hang'
+updated: 2026-10-13T19:50:24Z
+---
+
+`IO::Async::SSL` is only a `recommends` in `cpanfile`, and `lib/Net/Async/Forgejo/API.pm` never checks for it. `Net::Async::MikroTik` documents and guards exactly this case (`p5-net-async-mikrotik/lib/Net/Async/MikroTik.pm:337-351`): Net::Async::HTTP loads IO::Async::SSL only while connecting, and a load failure there leaks the connection slot - the first request fails, every later request to that host hangs. With `max_connections_per_host => 0` here the hang may not occur, but the first failure is still an opaque `Can't locate IO/Async/SSL.pm` from inside the transport. Not reproduced here (IO::Async::SSL is installed on this machine).
+
+Done when: an https `url` without a loadable IO::Async::SSL fails the Future at once with a message naming the module (same wording as the MikroTik sibling), and the behaviour is covered by a test that hides the module.
+
+---
+Fleet review 2026-10-06 · kind: bug · confidence: plausible
