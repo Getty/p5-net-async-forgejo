@@ -17,12 +17,24 @@ use WWW::Forgejo::HTTPResponse;
 our $VERSION = '0.001';
 
 use constant DEFAULT_MAX_PAGES => 100;
+use constant DEFAULT_TIMEOUT   => 30;
 
 sub configure {
     my ($self, %params) = @_;
 
-    $self->{url}   = delete $params{url}   if exists $params{url};
-    $self->{token} = delete $params{token} if exists $params{token};
+    # The internal WWW::Forgejo carries url and token; drop it on a change so
+    # the next request builds against the new values (requests in flight keep
+    # their old client).
+    for my $key (qw(url token)) {
+        next unless exists $params{$key};
+        $self->{$key} = delete $params{$key};
+        delete $self->{_forgejo};
+    }
+
+    $self->{timeout} = delete $params{timeout} if exists $params{timeout};
+    if (exists $params{http}) {
+        $self->{_http} = delete $params{http};
+    }
 
     $self->SUPER::configure(%params);
 }
@@ -34,6 +46,11 @@ Base URL of your Forgejo instance, e.g. C<https://src.ci>.
 =cut
 
 sub url {
+    my ($self) = @_;
+    return $self->_forgejo->url;
+}
+
+sub _raw_url {
     my ($self) = @_;
     $self->{url} // $ENV{FORGEJO_URL}
         // croak "No Forgejo URL configured.\n\n"
@@ -61,14 +78,19 @@ sub token {
 
 sub base_url {
     my ($self) = @_;
-    return $self->url . '/api/v1';
+    return $self->_forgejo->base_url;
+}
+
+sub timeout {
+    my ($self) = @_;
+    return $self->{timeout} // DEFAULT_TIMEOUT;
 }
 
 # Internal: sync Forgejo instance for request building and response parsing
 sub _forgejo {
     my ($self) = @_;
     $self->{_forgejo} //= WWW::Forgejo->new(
-        url   => $self->url,
+        url   => $self->_raw_url,
         token => $self->token,
     );
 }
@@ -80,6 +102,7 @@ sub _http {
         $self->{_http} = Net::Async::HTTP->new(
             user_agent => 'Net-Async-Forgejo/' . $VERSION,
             max_connections_per_host => 0,
+            timeout => $self->timeout,
         );
     }
     return $self->{_http};
@@ -87,7 +110,19 @@ sub _http {
 
 sub _add_to_loop {
     my ($self, $loop) = @_;
-    $self->add_child($self->_http);
+    my $http = $self->_http;
+    $self->add_child($http) if $http->isa('IO::Async::Notifier') && !$http->parent;
+}
+
+# Net::Async::HTTP loads IO::Async::SSL by name only while connecting; a load
+# failure there leaks the connection slot. Probe it up front for https URLs.
+sub _ssl_problem {
+    my ($self) = @_;
+    return unless $self->base_url =~ m{\Ahttps://}i;
+    return $self->{_ssl_problem} //= eval { require IO::Async::SSL; '' } // do {
+        my ($reason) = split /\n/, $@;
+        __PACKAGE__ . ": https needs IO::Async::SSL, which did not load: $reason\n";
+    } || undef;
 }
 
 # ============================================================================
@@ -96,6 +131,10 @@ sub _add_to_loop {
 
 sub _do_request {
     my ($self, $req) = @_;
+
+    if (my $problem = $self->_ssl_problem) {
+        return Future->fail($problem);
+    }
 
     my $uri = URI->new($req->url);
 
@@ -370,6 +409,28 @@ Base URL of your Forgejo instance.
 =head2 token
 
 Your Forgejo personal access token.
+
+=head2 base_url
+
+The API base URL requests go to: L</url> without a trailing slash and with
+C</api/v1> appended once.
+
+=head2 timeout
+
+Seconds before a stalled request fails its L<Future>. Defaults to 30.
+Settable via C<new> or C<configure>; applies to the default transport.
+
+=head2 http
+
+Constructor/C<configure> key only: an object with a C<do_request> method
+(normally a preconfigured L<Net::Async::HTTP>) to use instead of the default
+transport. C<timeout> does not apply to an injected object.
+
+C<url> and C<token> may be changed with C<configure> at any time; later
+requests use the new values.
+
+For C<https> URLs L<IO::Async::SSL> must be installed. If it cannot be loaded,
+requests fail at once with a message naming the module.
 
 =head1 METHODS
 

@@ -9,5 +9,14 @@
     including the search envelope, returning the same shape as WWW::Forgejo
   - Response headers pass through to WWW::Forgejo::HTTPResponse; body bytes
     and charset are handled like WWW::Forgejo::LWPIO
+  - New "timeout" configure key (default 30 s, as WWW::Forgejo::LWPIO) so a
+    stalled server fails the Future instead of leaving it pending forever
+  - New "http" configure key to inject a preconfigured transport
+  - configure(url/token) now takes effect for later requests; it used to keep
+    sending the old credentials after the first request
+  - url and base_url delegate to WWW::Forgejo (no more doubled /api/v1 or
+    trailing slash mismatch)
+  - https URL without a loadable IO::Async::SSL fails the Future at once
+    with a message naming the module
   - API errors arrive as failed Futures ("Forgejo API error: ..."), on
     follow-up pages too
