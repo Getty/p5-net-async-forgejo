@@ -1,0 +1,20 @@
+---
+class: standard
+created: 2026-10-19T22:35:18Z
+id: 11
+priority: low
+status: backlog
+tags:
+- async
+- bridge
+title: Die async-Dist haengt an privaten Methoden von WWW::Forgejo
+updated: 2026-10-19T22:35:18Z
+---
+
+Die async-Dist ruft private Methoden des sync Clients: _build_request, _parse_response, _check_response (Karte 10), _collection_ref und _collection_total. Der Versions-Pin im cpanfile ('WWW::Forgejo', '0.001') schuetzt nicht gegen abweichenden Inhalt: unter /home/getty/perl5 lag eine WWW::Forgejo 0.001 vom 23.8. installiert (gleiche Version, aelterer Inhalt, ohne _collection_ref). Im gebauten Tarball der async-Dist laeuft der Test gegen die installierte Version statt gegen den Nachbar-Checkout - deshalb scheitert 'dzil test' an 6 Testdateien, obwohl der Quellbaum gruen ist.
+
+Zwei Wege, die der Maintainer waehlen kann:
+- die async-Dist nutzt eine oeffentliche, dokumentierte API des sync Clients (die genutzten Methoden werden oeffentlich), oder
+- der Test der gebauten Dist prueft die Abhaengigkeit, die er braucht (dass die geladene WWW::Forgejo die benutzten Methoden hat), und sagt das klar, statt still in einen anderen Code zu laufen.
+
+Ergaenzend zur Release-Reihenfolge (WWW::Forgejo 0.001 vor Net::Async::Forgejo 0.001 auf CPAN): die lokale Installation des sync Clients muss vor dem Release aus dem Nachbar-Checkout erneuert werden, sonst prueft der Release-Test den alten Stand.
