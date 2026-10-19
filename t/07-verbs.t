@@ -12,6 +12,7 @@ use Future;
 use HTTP::Response;
 use JSON::MaybeXS qw(decode_json);
 use URI;
+use WWW::Forgejo;
 use Net::Async::Forgejo::API;
 
 # The verb methods follow the signatures of WWW::Forgejo::Role::HTTP:
@@ -160,6 +161,36 @@ subtest 'check: other statuses fail' => sub {
     $f->await;
     ok($f->is_failed, '500 fails the Future');
     like(scalar $f->failure, qr/\AForgejo API error: boom/, 'message from the body');
+};
+
+subtest 'check asks the sync client for the verdict' => sub {
+    # The rule has one source: the sync client decides what a response means.
+    # The transport only fetches the response and hands it over.
+    {
+        package Test::CheckClient;
+        use parent -norequire, 'WWW::Forgejo';
+        sub _check_response {
+            my ($self, $response, $method, $path) = @_;
+            push @{ $self->{calls} }, [ $response, $method, $path ];
+            return 'the rule of the subclass';
+        }
+    }
+
+    my ($api) = fake_api(204, [], '');
+    my $client = Test::CheckClient->new(url => 'https://src.ci', token => 't');
+    $client->{calls} = [];
+    $api->{_forgejo} = $client;
+
+    is($api->check('/repos/o/r/collaborators/u')->get, 'the rule of the subclass',
+        'check delegates to _check_response');
+
+    is(scalar @{ $client->{calls} }, 1, 'asked exactly once');
+    my ($response, $method, $path) = @{ $client->{calls}[0] // [] };
+    isa_ok($response, 'WWW::Forgejo::HTTPResponse',
+        'the response handed over is the one the rule expects');
+    is($response->status, 204, 'with the status of the reply');
+    is($method, 'GET', 'the method the request was sent with');
+    is($path, '/repos/o/r/collaborators/u', 'the path the request was sent with');
 };
 
 # ---------------------------------------------------------------------------

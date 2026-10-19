@@ -306,14 +306,10 @@ sub check {
     my $req = $forgejo->_build_request('GET', $path, %opts);
     return $self->_do_request($req)->then(sub {
         my ($response) = @_;
-        # Mirrors WWW::Forgejo::Role::HTTP check: a 404 is the "no" - unless it
-        # is the plain-text 404 of a route the instance does not have, which
-        # fails like any other error.
-        my $route_missing = ($response->headers->{'content-type'} // '') =~ m{\A\s*text/plain\b}i
-            && ($response->content // '') =~ /\A\s*404 page not found/;
-        return Future->done(0) if $response->status == 404 && !$route_missing;
-        $forgejo->_parse_response($response, 'GET', $path);
-        return Future->done(1);
+        # The verdict is the sync client's method: a 2xx is the "yes", a 404 the
+        # "no", everything else croaks - and so fails the Future. The rule
+        # lives in one place, not in this transport.
+        return Future->done($forgejo->_check_response($response, 'GET', $path));
     });
 }
 
@@ -532,6 +528,9 @@ for a 2xx response and to C<0> for C<404>; any other status fails it like the
 verb methods do. So does the plain-text C<404 page not found> of a route the
 instance does not have (an older Forgejo, a feature that is switched off),
 which would otherwise read as "no". C<params> adds a query string.
+
+The verdict is the sync client's own method, C<_check_response> in
+L<WWW::Forgejo::Role::HTTP>, so the rule has one source.
 
 =head1 SEE ALSO
 

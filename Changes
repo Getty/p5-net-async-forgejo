@@ -5,10 +5,12 @@
     released in lockstep with WWW::Forgejo 0.001
   - Future-based verbs get/post/put/patch/delete/check taking the WWW::Forgejo
     options params, upload (multipart) and raw; delete accepts a body
+  - check() takes its verdict from the sync client, so both clients answer
+    2xx with yes, 404 with no and every other status with an error
   - Non-blocking auto-pagination via X-Total-Count (page_size, max_pages),
-    including the search envelope and the Actions runs envelope (workflow_runs,
-    total from the body's total_count when there is no X-Total-Count header),
-    returning the same shape as WWW::Forgejo
+    including the search envelope and the Actions runs envelope
+    (workflow_runs, total from the body's total_count when there is no
+    X-Total-Count header), returning the same shape as WWW::Forgejo
   - Response headers pass through to WWW::Forgejo::HTTPResponse; body bytes
     and charset are handled like WWW::Forgejo::LWPIO
   - New "timeout" configure key (default 30 s, as WWW::Forgejo::LWPIO) so a
