@@ -1,0 +1,43 @@
+---
+class: standard
+completed: 2026-10-19T22:33:29Z
+created: 2026-10-19T21:13:26Z
+id: 10
+priority: medium
+started: 2026-10-19T22:33:29Z
+status: done
+tags:
+- async
+- bridge
+- escalated-from:WWW-Forgejo#29
+title: 'Bridge: async check() uses the shared _check_response of the sync client (paired
+  with WWW::Forgejo #29)'
+updated: 2026-10-19T22:33:29Z
+---
+
+Bridge: die async check() hoert auf, die Verdikt-Regel des sync Clients zu duplizieren.
+
+WWW::Forgejo #29 (Karte auf dem Sync-Board, dort in Arbeit) zieht das Verdikt aus Role::HTTP::check in eine Methode _check_response($response, $method, $path), die 0/1 zurueckgibt oder croakt: 2xx -> 1, 404 -> 0 - ausser dem text/plain '404 page not found' einer Route, die die Instanz nicht hat, das croakt wie jeder andere Fehler. Die Sync-Seite benutzt die Methode selbst; dort aendert sich nichts.
+
+Heute dupliziert lib/Net/Async/Forgejo/API.pm:303-318 genau diese Regel (route_missing ueber $response->headers->{'content-type'} und $response->content, danach $forgejo->_parse_response). Die async-Dist ist eine duenne Transportschicht ueber die sync-Dist, die Regel hat also genau eine Quelle.
+
+Done when:
+- die async check() die gemeinsame Helper-Methode aus WWW::Forgejo benutzt und die duplizierte Regel im async-Modul entfaellt,
+- das Verhalten unveraendert bleibt: 2xx -> 1, 404 -> 0, das text/plain-404 einer fehlenden Route croakt, jeder andere Status croakt mit der Meldung aus dem Body,
+- t/ bleibt gruen und ein Test haelt die drei Verdikte (2xx, 404, route-missing-404) und den Fehlerfall fest.
+
+Hinweise fuer die Umsetzung:
+- lies zuerst die Sync-Implementierung (liegt im Nachbar-Checkout bzw. kommt mit WWW::Forgejo #29) und passende ihre Parameterform an. Die Sync-Seite arbeitet mit einer WWW::Forgejo HTTPResponse, die async-Seite mit einer Net::Async::HTTP::Response. Passen die Formen nicht zusammen, aendere die sync-Dist NICHT von hier: schreib die Unstimmigkeit als Notiz auf diese Karte, mit der konkreten Signatur, die du brauchst. Der Koordinator legt die gepaarte Karte auf dem Sync-Board an.
+- die sync-Dist muss auf CPAN sein (WWW::Forgejo 0.001), bevor diese Dist veroeffentlicht werden kann - das cpanfile der async-Dist requiret sie. Das ist eine Reihenfolgefrage, kein Blocker fuer den Code.
+
+2026-10-19 22:30 Umsetzung: lib/Net/Async/Forgejo/API.pm check() ruft jetzt $forgejo->_check_response($response, 'GET', $path) und liefert das Ergebnis (0/1) als Future-Done zurueck; die duplizierte route_missing-Regel (content-type + content, _parse_response) ist aus dem async-Modul entfernt. Die Antwortformen passen: _do_request verpackt die Antwort bereits als WWW::Forgejo::HTTPResponse (API.pm:160), genau die Form, die _check_response erwartet (status/content/headers). Es ist KEINE gepaarte Karte auf dem Sync-Board noetig - die Karte vermutete eine Unstimmigkeit, die es nicht gibt.
+
+2026-10-19 22:30 Verifikation: prove -l t/ (mit PERL5LIB auf den Nachbar-Checkout) -> 9 Dateien, 62 Tests, PASS. Der neue Subtest 'check asks the sync client for the verdict' in t/07-verbs.t ist gegen das alte lib/ ROT (gefunden '1' statt 'the rule of the subclass', _check_response wurde nie gerufen) und gegen das neue lib/ gruen; die Rot-Pruefung lief mit dem alten lib/ aus main plus den neuen Tests in einem Temp-Verzeichnis, der Fehlschlag war das Verhalten, kein 'Can't locate'. Die vier bestehenden Verdikt-Tests (2xx -> 1, JSON-404 -> 0, text/plain-404 einer fehlenden Route -> gescheitertes Future, 500 -> gescheitertes Future mit der Body-Meldung) decken die Karte ab und bleiben unveraendert gruen. Live am Wegwerf-Forgejo (localhost:13080, nur GETs): /user -> 1, JSON-404 -> 0, Route '404 page not found' -> gescheitertes Future mit 'Forgejo API error: 404 page not found'.
+
+2026-10-19 22:30 Randnotizen fuer den Release-Manager: (1) Die cpanfile-Angabe 'WWW::Forgejo', '0.001' bleibt unveraendert - WWW::Forgejo war noch nie auf CPAN (Changes der Sync-Dist hat nur {{$NEXT}} = Initial release), der koordinierte Release publiziert also zuerst 0.001 mit _check_response und danach diese Dist. (2) Auf diesem Rechner ist unter /home/getty/perl5 ein veraltetes WWW::Forgejo 0.001 vom 23.8. installiert (ohne _collection_ref, mit alter base_url-Logik). 'dzil test' scheitert deshalb an 6 Testdateien - das tritt auch mit unveraendertem main auf (reproduziert), ist also keine Folge dieser Aenderung, aber es blockiert das Release-Audit, bis die lokale Installation aus dem Nachbar-Checkout erneuert wird. (3) Die Croak-Meldung selbst ist unveraendert ('Forgejo API error: ...'), nur der Ort im Dateiende verschiebt sich von API.pm:315 auf API.pm:312 (beide Stellen im async-Modul, Carp ueberspringt die Frames im Role::HTTP-Paket). (4) Das Briefing des Koordinators nennt t/03-integration.t einen Live-Test mit Skip ohne TEST_FORGEJO_URL/TOKEN - die Datei ist offline und laeuft durch; im Async-Board gibt es keinen Live-Test.
+
+2026-10-19 22:30 Test (t/07-verbs.t): neuer Subtest 'check asks the sync client for the verdict' - eine WWW::Forgejo-Teilklasse ueberschreibt _check_response und liefert einen Sentinel; der Test prueft, dass check() genau einmal fragt und dabei die WWW::Forgejo::HTTPResponse der Antwort, die Methode GET und den Pfad uebergibt. Die vier bestehenden Verdikt-Subtests bleiben unveraendert (2xx -> 1, JSON-404 -> 0, text/plain-404 -> gescheitertes Future, 500 -> gescheitertes Future). Kein Eingriff in t/03-integration.t, keine Aenderung der oeffentlichen API; die POD von check() erwaehnt jetzt die gemeinsame Quelle des Verdikts.
+
+2026-10-19 22:31 Fertig: die async check() fragt den sync Client nach dem Verdikt (WWW::Forgejo::Role::HTTP::_check_response), die duplizierte Regel im async-Modul ist weg. Geaendert: lib/Net/Async/Forgejo/API.pm (check() + ein Satz POD), t/07-verbs.t (neuer Subtest 'check asks the sync client for die Verdikt'-Delegation, die vier bestehenden Verdikt-Tests bleiben unveraendert). Verifiziert: prove -l t/ mit PERL5LIB auf ../p5-www-forgejo/lib -> 9 Dateien, 62 Tests, PASS; der neue Test ist gegen das alte lib/ aus main rot (Verhalten, kein 'Can't locate') und gegen das neue gruen; live am Wegwerf-Forgejo (nur GETs): 2xx -> 1, JSON-404 -> 0, Route '404 page not found' -> gescheitertes Future mit 'Forgejo API error: 404 page not found'. Nicht committet (Baum commit-fertig). Commit-Vorschlag: 'Use the shared check verdict of the sync client' / Changes: 'The verdict of check() comes from the sync client, so the rule has one source.' Details und Randnotizen (cpanfile-Pin, veraltete lokale WWW::Forgejo-Installation, die 'dzil test' auch mit unveraendertem main scheitern laesst) stehen als Notizen auf der Karte.
+
+Umsetzung geprueft und committet: 7e63010 'Use the shared check verdict of the sync client (k10)' (Fast-forward in lokalen main, kein Push). Der neue Subtest in t/07-verbs.t ist gegen das alte lib/ rot (Delegation fehlt) und gegen das neue gruen; prove -l t/ -> 9 Dateien, 62 Tests PASS. Release-Hinweis: WWW::Forgejo 0.001 muss vor dieser Dist auf CPAN sein; die lokal unter /home/getty/perl5 installierte WWW::Forgejo 0.001 ist veraltet (gleiche Version, aelterer Inhalt, ohne _collection_ref) und laesst 'dzil test' fehlschlagen - vor dem Release aus dem Nachbar-Checkout neu installieren.
