@@ -17,7 +17,9 @@ dzil build
 ## Delegation
 
 Delegate behavior-relevant code to the right agent instead of touching it yourself —
-principle and lane are in `.claude/rules/net-async-forgejo-rules.md`.
+the delegation lock and the publish gate are shared house rules (skilletor bundle
+`getty-cpan-dist@getty`); lanes and the release coupling are in
+`.claude/rules/net-async-forgejo-rules.md`.
 
 | Task | Agent |
 |---|---|
@@ -26,5 +28,6 @@ principle and lane are in `.claude/rules/net-async-forgejo-rules.md`.
 
 The agents carry their skills via `briefing.skills` (see `.claude/agents/`); the main
 agent delegates rather than loading them. Skill sources live under `.claude/skills/`
-(`net-async-forgejo-core` plus hardlinked shared skills). House rules and the
-delegation lock: `.claude/rules/net-async-forgejo-rules.md`.
+(`net-async-forgejo-core` plus hardlinked shared skills). The delegation lock is a shared
+house rule (bundle `getty-cpan-dist@getty`); repo-specific house rules:
+`.claude/rules/net-async-forgejo-rules.md`.
