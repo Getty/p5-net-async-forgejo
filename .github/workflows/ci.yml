@@ -26,4 +26,20 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: perl -V
         run: perl -V
+      # WWW::Forgejo is built from the sibling repository's HEAD, so CI runs
+      # against the same state as the local fleet.
+      - name: Checkout WWW::Forgejo
+        uses: actions/checkout@v4
+        with:
+          repository: Getty/p5-www-forgejo
+          path: vendor/p5-www-forgejo
+      - name: Install WWW::Forgejo from the sibling repository
+        working-directory: vendor/p5-www-forgejo
+        shell: bash
+        run: |
+          set -euo pipefail
+          cpanm -nq Dist::Zilla
+          dzil authordeps --missing | cpanm -nq
+          dzil listdeps --author --missing | cpanm -nq
+          dzil install
       - uses: Getty/p5-dist-zilla-pluginbundle-author-getty/.github/actions/dzil-test@v1
