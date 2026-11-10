@@ -28,6 +28,6 @@ the delegation lock and the publish gate are shared house rules (skilletor bundl
 
 The agents carry their skills via `briefing.skills` (see `.claude/agents/`); the main
 agent delegates rather than loading them. Skill sources live under `.claude/skills/`
-(`net-async-forgejo-core` plus hardlinked shared skills). The delegation lock is a shared
+(`net-async-forgejo-core` plus the shared skills skilletor installs). The delegation lock is a shared
 house rule (bundle `getty-cpan-dist@getty`); repo-specific house rules:
 `.claude/rules/net-async-forgejo-rules.md`.
